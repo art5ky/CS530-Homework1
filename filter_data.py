@@ -1,6 +1,5 @@
 import numpy
 import pandas as pd
-import io
 import matplotlib.pyplot as plt
 from KalmanFilter import KalmanFilter
 
@@ -15,9 +14,9 @@ raw_data = df[['seconds_elapsed', 'x', 'y', 'z']].values
 
 # 2. Setup Variables
 # Because the dataset is small (11 rows), we will only use 2 rows for the still time.
-still_time = 100 
+still_time = 100
 process_noise = 0.001
-still_var = 1000
+still_var = 0.01
 
 # Calculate mean dt by looking at the differences in the time column
 mean_dt = numpy.mean(numpy.diff(raw_data[:, 0]))
@@ -34,10 +33,16 @@ kfilter = KalmanFilter(mean_dt, system_noise=process_noise, measurement_noise=st
 filtered_data = []
 filtered_covariances = []
 
+use_stops = True
+stop_times = [1200]
+
 # Subtract the bias, which hopefully includes gravity
-for datum in (accel_data - bias):
+for idx, datum in enumerate((accel_data - bias)):
     kfilter.predict()
-    kfilter.update(datum)
+    if use_stops and idx in stop_times: 
+        kfilter.zero_velocity_update()
+    else:
+        kfilter.update(datum)
     # kfilter.x is shape (9,1). flatten() turns it into a 1D array of 9 elements.
     filtered_data.append(kfilter.x.flatten())
     filtered_covariances.append(kfilter.P)
@@ -86,4 +91,63 @@ plt.tight_layout()
 plt.savefig('xy_position_separate.png')
 plt.close()
 
-print("Successfully generated separate plots.")
+# --- 3. Velocity Graph (Separately, No Points) ---
+plt.figure(figsize=(10, 8))
+
+# Velocity X
+plt.subplot(3, 1, 1)
+plt.plot(times, filtered_data[:, 3], label='Filtered Velocity X', color='blue', linestyle='-')
+plt.title('Velocity over Time')
+plt.ylabel('X Velocity')
+plt.legend()
+plt.grid(True)
+
+# Velocity Y
+plt.subplot(3, 1, 2)
+plt.plot(times, filtered_data[:, 4], label='Filtered Velocity Y', color='orange', linestyle='-')
+plt.ylabel('Y Velocity')
+plt.legend()
+plt.grid(True)
+
+# Velocity Z
+plt.subplot(3, 1, 3)
+plt.plot(times, filtered_data[:, 5], label='Filtered Velocity Z', color='green', linestyle='-')
+plt.xlabel('Time (s)')
+plt.ylabel('Z Velocity')
+plt.legend()
+plt.grid(True)
+
+plt.tight_layout()
+plt.savefig('velocity_separate.png')
+plt.close()
+
+# --- 4. Position Graph (Separately X, Y, Z over Time) ---
+plt.figure(figsize=(10, 8))
+
+# Position X
+plt.subplot(3, 1, 1)
+plt.plot(times, filtered_data[:, 6], label='Estimated Position X', color='purple', linestyle='-')
+plt.title('Position over Time')
+plt.ylabel('X Position')
+plt.legend()
+plt.grid(True)
+
+# Position Y
+plt.subplot(3, 1, 2)
+plt.plot(times, filtered_data[:, 7], label='Estimated Position Y', color='magenta', linestyle='-')
+plt.ylabel('Y Position')
+plt.legend()
+plt.grid(True)
+
+# Position Z
+plt.subplot(3, 1, 3)
+plt.plot(times, filtered_data[:, 8], label='Estimated Position Z', color='violet', linestyle='-')
+plt.xlabel('Time (s)')
+plt.ylabel('Z Position')
+plt.legend()
+plt.grid(True)
+
+plt.tight_layout()
+plt.savefig('position_separate.png')
+plt.close()
+print("Successfully generated velocity plots.")
