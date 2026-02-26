@@ -1,40 +1,42 @@
-import numpy
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from KalmanFilter import KalmanFilter
 
+# Tunable stop_times array. Value in array represents the row in the accel_data to which we plan to perform zero update velocity.
+use_stops = True
+stop_times = [200]
+crop_data_val = -350
 
-# --- Data Loading and Processing ---
+# Obtain samples of acceleration data where I stood still. I stood still in the beginning and end of the recording.
+still_samples_start = 8
+still_samples_end = 4
 
-df = pd.read_csv("data/Accelerometer.csv")
+# Load the raw accelerometer CSV data into a DataFrame 
+df = pd.read_csv("data/linear_acceleration_2026-02-26_14.26.08.csv", comment="#")
+raw_data = df[['time', 'ax (m/s^2)', 'ay (m/s^2)', 'az (m/s^2)']].values
 
-# Format data into a matrix: [seconds_elapsed, x, y, z] 
-# (Note: CSV has z, y, x, so we reorder to x, y, z for standard convention)
-raw_data = df[['seconds_elapsed', 'x', 'y', 'z']].values
+start_stationary_data = raw_data[:still_samples_start, 1:4]
+end_stationary_data = raw_data[-still_samples_end:, 1:4]
+full_stationary_data = np.concatenate((start_stationary_data, end_stationary_data), axis=0)
 
-# 2. Setup Variables
-# Because the dataset is small (11 rows), we will only use 2 rows for the still time.
-still_time = 100
-process_noise = 0.001
-still_var = 0.01
+# Finding mean of stationary samples to obtain bias estimate (removing factors like gravity).
+bias = np.mean(full_stationary_data, axis=0)
 
-# Calculate mean dt by looking at the differences in the time column
-mean_dt = numpy.mean(numpy.diff(raw_data[:, 0]))
+# Dynamic measurement and process noise parameters. 
+still_var = np.mean(np.var(full_stationary_data, axis=0), axis=0)
+process_noise = still_var / 10
 
-# Find gravity and other biases during a time period where you don't move
-bias = numpy.mean(numpy.concatenate((raw_data[:still_time, 1:4], raw_data[-still_time:, 1:4])), axis=0)
+# Calculating dt by taking the mean of differences in the time column of raw CSV data.
+dt = np.mean(np.diff(raw_data[:, 0]))
 
 # Slice the data to omit the calibration windows
-times = raw_data[still_time:-still_time, 0]
-accel_data = raw_data[still_time:-still_time, 1:4]
+times = raw_data[still_samples_start:crop_data_val, 0]
+accel_data = raw_data[still_samples_start:crop_data_val, 1:4]
 
-# 3. Apply Kalman Filter
-kfilter = KalmanFilter(mean_dt, system_noise=process_noise, measurement_noise=still_var)
+kfilter = KalmanFilter(dt, system_noise=process_noise, measurement_noise=still_var)
 filtered_data = []
 filtered_covariances = []
-
-use_stops = True
-stop_times = [1200]
 
 # Subtract the bias, which hopefully includes gravity
 for idx, datum in enumerate((accel_data - bias)):
@@ -47,7 +49,7 @@ for idx, datum in enumerate((accel_data - bias)):
     filtered_data.append(kfilter.x.flatten())
     filtered_covariances.append(kfilter.P)
 
-filtered_data = numpy.array(filtered_data)
+filtered_data = np.array(filtered_data)
 
 # --- 1. Acceleration Graph (Separately, No Points) ---
 plt.figure(figsize=(10, 8))
@@ -81,7 +83,7 @@ plt.close()
 
 # --- 2. X-Y Position Graph (Separately) ---
 plt.figure(figsize=(8, 6))
-plt.plot(filtered_data[:, 6], filtered_data[:, 7], color='purple', linestyle='-', label='Estimated Position')
+plt.plot(filtered_data[:, 7], filtered_data[:, 6], color='purple', linestyle='-', label='Estimated Position')
 plt.title('Estimated X-Y Position Trajectory')
 plt.xlabel('Position X')
 plt.ylabel('Position Y')

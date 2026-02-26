@@ -1,2 +1,0 @@
-version,device name,recording epoch time,recording time,recording timezone,platform,appVersion,device id,sensors,sampleRateMs,standardisation
-3,SM-S908U1,1771998720708,2026-02-25_05-52-00,America/New_York,android,1.52.0,2f7b1e1c-7997-4265-b985-c6ace7a6f100,Accelerometer|Annotation|TotalAcceleration|AccelerometerUncalibrated,10||10|10,false
