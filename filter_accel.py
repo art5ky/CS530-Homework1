@@ -2,54 +2,53 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from KalmanFilter import KalmanFilter
+import csv
 
 # Tunable stop_times array. Value in array represents the row in the accel_data to which we plan to perform zero update velocity.
 use_stops = True
-stop_times = [200]
-crop_data_val = -350
+stop_times = list(range(0,280,1))
 
 # Obtain samples of acceleration data where I stood still. I stood still in the beginning and end of the recording.
-still_samples_start = 8
-still_samples_end = 4
+still_sample = 0
 
 # Load the raw accelerometer CSV data into a DataFrame 
 df = pd.read_csv("data/linear_acceleration_2026-02-26_14.26.08.csv", comment="#")
 raw_data = df[['time', 'ax (m/s^2)', 'ay (m/s^2)', 'az (m/s^2)']].values
 
-start_stationary_data = raw_data[:still_samples_start, 1:4]
-end_stationary_data = raw_data[-still_samples_end:, 1:4]
+start_stationary_data = raw_data[:still_sample, 1:4]
+end_stationary_data = raw_data[-still_sample:, 1:4]
 full_stationary_data = np.concatenate((start_stationary_data, end_stationary_data), axis=0)
 
 # Finding mean of stationary samples to obtain bias estimate (removing factors like gravity).
 bias = np.mean(full_stationary_data, axis=0)
 
 # Dynamic measurement and process noise parameters. 
-still_var = np.mean(np.var(full_stationary_data, axis=0), axis=0)
-process_noise = still_var / 10
+still_var = np.mean(np.var(full_stationary_data, axis=0), axis=0) * 2
+process_noise = still_var / 1e4
 
 # Calculating dt by taking the mean of differences in the time column of raw CSV data.
 dt = np.mean(np.diff(raw_data[:, 0]))
 
 # Slice the data to omit the calibration windows
-times = raw_data[still_samples_start:crop_data_val, 0]
-accel_data = raw_data[still_samples_start:crop_data_val, 1:4]
+times = raw_data[still_sample:, 0]
+accel_data = raw_data[still_sample:, 1:4]
 
 kfilter = KalmanFilter(dt, system_noise=process_noise, measurement_noise=still_var)
 filtered_data = []
 filtered_covariances = []
 
-# Subtract the bias, which hopefully includes gravity
 for idx, datum in enumerate((accel_data - bias)):
     kfilter.predict()
+    # use zero velocity update on the 2 seconds we were still. 
     if use_stops and idx in stop_times: 
         kfilter.zero_velocity_update()
     else:
         kfilter.update(datum)
-    # kfilter.x is shape (9,1). flatten() turns it into a 1D array of 9 elements.
     filtered_data.append(kfilter.x.flatten())
     filtered_covariances.append(kfilter.P)
 
 filtered_data = np.array(filtered_data)
+
 
 # --- 1. Acceleration Graph (Separately, No Points) ---
 plt.figure(figsize=(10, 8))
@@ -82,8 +81,8 @@ plt.savefig('acceleration_separate.png')
 plt.close()
 
 # --- 2. X-Y Position Graph (Separately) ---
-plt.figure(figsize=(8, 6))
-plt.plot(filtered_data[:, 7], filtered_data[:, 6], color='purple', linestyle='-', label='Estimated Position')
+plt.figure(figsize=(8, 8))
+plt.plot(filtered_data[:, 6], filtered_data[:, 7], color='purple', linestyle='-', label='Estimated Position')
 plt.title('Estimated X-Y Position Trajectory')
 plt.xlabel('Position X')
 plt.ylabel('Position Y')
@@ -123,33 +122,4 @@ plt.tight_layout()
 plt.savefig('velocity_separate.png')
 plt.close()
 
-# --- 4. Position Graph (Separately X, Y, Z over Time) ---
-plt.figure(figsize=(10, 8))
 
-# Position X
-plt.subplot(3, 1, 1)
-plt.plot(times, filtered_data[:, 6], label='Estimated Position X', color='purple', linestyle='-')
-plt.title('Position over Time')
-plt.ylabel('X Position')
-plt.legend()
-plt.grid(True)
-
-# Position Y
-plt.subplot(3, 1, 2)
-plt.plot(times, filtered_data[:, 7], label='Estimated Position Y', color='magenta', linestyle='-')
-plt.ylabel('Y Position')
-plt.legend()
-plt.grid(True)
-
-# Position Z
-plt.subplot(3, 1, 3)
-plt.plot(times, filtered_data[:, 8], label='Estimated Position Z', color='violet', linestyle='-')
-plt.xlabel('Time (s)')
-plt.ylabel('Z Position')
-plt.legend()
-plt.grid(True)
-
-plt.tight_layout()
-plt.savefig('position_separate.png')
-plt.close()
-print("Successfully generated velocity plots.")
