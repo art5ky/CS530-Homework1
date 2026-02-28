@@ -1,0 +1,20 @@
+{
+  "image_path": "maps/map_mask.png",
+  "dimensions": {
+    "width_px": 572,
+    "height_px": 277
+  },
+  "resolution": {
+    "pixels_per_meter": 12.76,
+    "description": "Each pixel represents 0.05 meters (61 pixels / 188.25 inches -> ~4.78 meters)"
+  },
+  "origin": {
+    "x_meters": 0.0,
+    "y_meters": 0.0,
+    "description": "The world coordinates of the bottom-left (or top-left) pixel"
+  },
+  "metadata": {
+    "unit": "meters",
+    "created_at": "2026-02-27"
+  }
+}
