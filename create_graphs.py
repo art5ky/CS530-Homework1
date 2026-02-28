@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+# Must run filter_accel.py first to store filtered_data.csv in data folder
 df = pd.read_csv("data/filtered_data.csv")
 filtered_data = df[['time','a_x','a_y','a_z','v_x','v_y','v_z','x','y','z']].values
 df = pd.read_csv("data/linear_acceleration_2026-02-26_14.26.08.csv", comment="#")
@@ -42,7 +43,7 @@ plt.close()
 plt.figure(figsize=(10, 8))
 
 plt.subplot(3, 1, 1)
-plt.plot(times, filtered_data[:, 5], label='Filtered Velocity X', color='blue', linestyle='-')
+plt.plot(times, filtered_data[:, 4], label='Filtered Velocity X', color='blue', linestyle='-')
 plt.title('Velocity over Time')
 plt.ylabel('X Velocity')
 plt.legend()

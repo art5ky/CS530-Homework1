@@ -11,20 +11,21 @@ stop_times = list(range(0, 250, 1))
 df = pd.read_csv("data/linear_acceleration_2026-02-26_14.26.08.csv", comment="#")
 raw_data = df[['time', 'ax (m/s^2)', 'ay (m/s^2)', 'az (m/s^2)']].values
 
-# Dynamic noise and time parameters computed from the raw data. 
-still_var = np.mean(np.var(raw_data[:, 1:4], axis=0), axis=0)
-process_noise = still_var / 1e3
-dt = np.mean(np.diff(raw_data[:, 0]))
-
-# Slice the data to omit the calibration windows
-times = raw_data[:, 0]
+# Recorded with -Y (Front) and -X (Right) axis. Flipping acceleration values for better clarity. 
 accel_data = raw_data[:, 1:4]
+accel_data = [-val for val in accel_data]
+times = raw_data[:, 0]
+
+# Dynamic noise and time parameters computed from the raw data. 
+still_var = np.mean(np.var(accel_data, axis=0), axis=0)
+process_noise = still_var / 1e2
+dt = np.mean(np.diff(times))
 
 kfilter = KalmanFilter(dt, system_noise=process_noise, measurement_noise=still_var)
 filtered_data = []
 filtered_covariances = []
 
-bias = np.mean(raw_data[:, 1:4], axis=0)
+bias = np.mean(accel_data, axis=0)
 for idx, datum in enumerate((accel_data - bias)):
     kfilter.predict()
     if use_stops and idx in stop_times: 
@@ -34,10 +35,11 @@ for idx, datum in enumerate((accel_data - bias)):
     filtered_data.append(kfilter.x.flatten())
     filtered_covariances.append(kfilter.P)
 
+# adding time array as a column for the filtered_data array
 filtered_data = np.hstack((times.reshape(-1, 1), np.array(filtered_data)))
 
 with open('data/filtered_data.csv', 'w', newline='') as csvfile:
-    csvfile.write("time,a_x,a_y,a_z,v_x,v_y,v_z,x,y,z\n")
+    csvfile.write("time,a_y,a_x,a_z,v_y,v_x,v_z,y,x,z\n")
     writer = csv.writer(csvfile, delimiter=',')
     writer.writerows(filtered_data)
 
